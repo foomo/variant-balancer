@@ -106,11 +106,3 @@ func TestLocking(t *testing.T) {
 	c.Cancel(id)
 	wg.Wait()
 }
-
-func TestUtils(t *testing.T) {
-	// this one is a little weak, but hey it runs the code ;)
-	c := compress([]byte("asc"))
-	assert.True(t, len(c) > 0)
-	assert.True(t, len(createHashFromUri("/foo")) > 0)
-
-}
