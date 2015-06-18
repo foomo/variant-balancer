@@ -10,12 +10,14 @@ type Node struct {
 }
 
 type Variant struct {
-	Id    string  `json:id"`
+	Id string `json:id"`
+	// 0-100 %
 	Share int64   `json:share"`
 	Nodes []*Node `json:nodes"`
 }
 
 type Config struct {
-	Id       string `json:id"`
-	Variants []*Variant
+	Id             string     `json:id"`
+	Variants       []*Variant `json:variants"`
+	SessionTimeout int        `json:sessionTimeout"`
 }
