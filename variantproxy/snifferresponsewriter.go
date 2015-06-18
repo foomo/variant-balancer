@@ -35,19 +35,20 @@ func (srw *SnifferResponseWriter) returnSessionId() {
 	if !srw.done {
 		srw.done = true
 		cookies := readSetCookies(srw.responseWriter.Header())
-		var sessionId string
+		sessionId := ""
 		for _, cookie := range cookies {
 			if cookie.Name == srw.cookieName {
 				sessionId = cookie.Value
 				break
 			}
 		}
+		//srw.sessionIdChannel <- sessionId
 		if len(sessionId) > 0 {
-			sessionId = srw.cookieName + sessionId
+			debug("sniffer response writer extracted session", sessionId, "for", srw.cookieName)
+		} else {
+			debug("sniffer response writer no session found")
 		}
 
-		//srw.sessionIdChannel <- sessionId
-		// log.Println("SnifferResponseWriter returned session", sessionId, "for", srw.cookieName, "from", cookies)
 		srw.SessionId = sessionId
 	}
 }

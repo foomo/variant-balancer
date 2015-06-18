@@ -14,6 +14,7 @@ type Node struct {
 	Id                string
 	openConnections   int
 	maxConnections    int
+	Hits              int64
 	ReverseProxy      *httputil.ReverseProxy
 	channelOpenConn   chan int
 	channelCloseConn  chan int
@@ -28,6 +29,7 @@ func NewNode(nodeConfig *config.Node) *Node {
 	n := &Node{
 		Server:            nodeConfig.Server,
 		Url:               url,
+		Hits:              0,
 		Id:                nodeConfig.Id,
 		ReverseProxy:      reverseProxy,
 		SessionCookieName: nodeConfig.Cookie,
@@ -37,11 +39,19 @@ func NewNode(nodeConfig *config.Node) *Node {
 		channelCloseConn:  make(chan int),
 	}
 	go func() {
+		debugConn := func(msg string) {
+			if Debug {
+				debug(msg, n.Id, "================================> open", n.openConnections, "hits", n.Hits, "load", n.Load())
+			}
+		}
 		for {
 			select {
 			case <-n.channelCloseConn:
+				debugConn("node close conn")
 				n.openConnections--
 			case <-n.channelOpenConn:
+				n.Hits++
+				debugConn("node open conn")
 				n.openConnections++
 			}
 		}
@@ -65,7 +75,7 @@ func (n *Node) closeConn() {
 func (n *Node) ServeHTTP(w http.ResponseWriter, incomingRequest *http.Request) {
 	n.channelOpenConn <- 1
 	defer func() {
-		if r := recover(); r != nil {
+		if err := recover(); err != nil {
 			n.closeConn()
 		}
 	}()
