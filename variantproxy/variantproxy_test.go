@@ -30,7 +30,6 @@ func makeSessionId() (string, error) {
 var hello = []byte("hello")
 
 func TestUtils(t *testing.T) {
-	assert.True(t, len(createHashFromUri("/foo")) > 0)
 	// this one is a little weak, but hey it runs the code ;)
 	c := compress([]byte("asc"))
 	assert.True(t, len(c) > 0)
@@ -67,7 +66,7 @@ func getTestServerAndNode(id string, cookieName string, maxConnections int) (ts 
 }
 
 func TestNode(t *testing.T) {
-
+	Debug = true
 	var wg sync.WaitGroup
 
 	ts, n := getTestStuff()
@@ -143,7 +142,7 @@ func TestNodeResolution(t *testing.T) {
 			req.AddCookie(cookie)
 		}
 		writer := httptest.NewRecorder()
-		extractedSessionId := proxy.ServeHTTP(writer, req)
+		extractedSessionId, _ := proxy.ServeHTTPAndCache(writer, req, "")
 		return extractedSessionId
 	}
 
@@ -230,6 +229,55 @@ func TestNodeResolution(t *testing.T) {
 
 			})
 
+		})
+	})
+
+}
+
+func TestProxyCache(t *testing.T) {
+
+	call := func(proxy *Proxy, cookieName string, sessionId string, path string) {
+		req, _ := http.NewRequest("GET", "http://127.0.0.1"+path, nil)
+		if len(sessionId) > 0 {
+			cookie := &http.Cookie{
+				Name:   cookieName,
+				Value:  sessionId,
+				Path:   "/",
+				Domain: req.URL.Host,
+			}
+			req.AddCookie(cookie)
+		}
+		writer := httptest.NewRecorder()
+		proxy.ServeHTTPAndCache(writer, req, path)
+		if writer.Body.Len() == 0 {
+			t.Fatal("empty reply")
+		}
+	}
+
+	cookieName := "foo"
+	serverA, nodeA := getTestServerAndNode("aa", cookieName, 1)
+	serverB, nodeB := getTestServerAndNode("ab", cookieName, 1)
+
+	defer serverA.Close()
+	defer serverB.Close()
+
+	convey.Convey("Given I set up a proxy", t, func() {
+		proxy := newProxy([]*Node{nodeA, nodeB})
+		convey.Convey("When I call the proxy allowing it to cache", func() {
+			pathAndId := "/"
+			call(proxy, cookieName, "", pathAndId)
+			convey.Convey("Then there is an item in my cache", func() {
+				convey.So(proxy.cache.GetLock(pathAndId), convey.ShouldNotBeNil)
+			})
+			convey.Convey("When I request the item again, there will be no further requests to the nodes", func() {
+				currentHits := func() int64 { return nodeA.Hits + nodeB.Hits }
+				expectedHits := currentHits()
+				call(proxy, cookieName, "", pathAndId)
+				call(proxy, cookieName, "", pathAndId)
+				call(proxy, cookieName, "", pathAndId)
+				call(proxy, cookieName, "", pathAndId)
+				convey.So(currentHits(), convey.ShouldEqual, expectedHits)
+			})
 		})
 	})
 
