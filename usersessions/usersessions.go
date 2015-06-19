@@ -2,7 +2,6 @@ package usersessions
 
 import (
 	"github.com/foomo/variant-balancer/config"
-	//"log"
 	"net/http"
 	"time"
 )
@@ -91,30 +90,28 @@ func (s *Sessions) extractSessionId(incomingRequest *http.Request) string {
 	return ""
 }
 
-func (us *Sessions) getUserVariant(incomingRequest *http.Request) (v *Variant, sessionId string) {
-	sessionId = us.extractSessionId(incomingRequest)
-	// log.Println("getting user variant for sessionId", sessionId)
+// get an existing user variant
+func (us *Sessions) GetExistingUserVariant(incomingRequest *http.Request) *Variant {
+	sessionId := us.extractSessionId(incomingRequest)
 	if len(sessionId) > 0 {
-		// there is a session cookie
-		return us.getVariantForUserSessionId(sessionId), sessionId
-	} else if us.Active {
-		return us.getRandomVariant(), sessionId
+		return us.getVariantForUserSessionId(sessionId)
 	}
-	return nil, sessionId
+	return nil
 }
 
-func (us *Sessions) serveVariant(variant *Variant, w http.ResponseWriter, incomingRequest *http.Request, cacheId string) (sessionId string, err error) {
-	sessionId, err = variant.Serve(w, incomingRequest, cacheId)
+func (us *Sessions) GetBalancedRandomVariant() *Variant {
+	variantId := getBalancedRandomVariantId(getVariantStats(us.Variants, us.UserSessions, us.SessionTimeout))
+	variant, _ := us.Variants[variantId]
+	return variant
+}
+
+func (us *Sessions) ServeVariant(variant *Variant, w http.ResponseWriter, incomingRequest *http.Request, cacheId string) (err error) {
+	sessionId, err := variant.Serve(w, incomingRequest, cacheId)
 	if err == nil && len(sessionId) > 0 {
 		us.SessionPingChannel <- &VariantSessionPing{
 			SessionId: sessionId,
 			VariantId: variant.Id,
 		}
 	}
-	return sessionId, err
-}
-
-func (us *Sessions) Serve(w http.ResponseWriter, incomingRequest *http.Request, cacheId string) (sessionId string, err error) {
-	variant, _ := us.getUserVariant(incomingRequest)
-	return us.serveVariant(variant, w, incomingRequest, cacheId)
+	return err
 }

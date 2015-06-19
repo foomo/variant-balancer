@@ -7,46 +7,58 @@ import (
 )
 
 type SessionStats struct {
-	Sessions       int64
-	ActiveSessions int64
-	Pageviews      int64
-	LastVisit      string
+	Sessions       int64   `json:"sessions"`
+	ActiveSessions int64   `json:"activeSessions"`
+	ActiveShare    float64 `json:"activeShare"`
+	Share          float64 `json:"share"`
+	Pageviews      int64   `json:"pageViews"`
+	LastVisit      string  `json:"lastVisit"`
 }
 
 type SessionsStatus struct {
-	Config       *config.Config
-	Active       bool
-	Stats        *SessionStats
-	VariantStats map[string]*SessionStats
+	Config       *config.Config           `json:"config"`
+	Active       bool                     `json:"active"`
+	Stats        *SessionStats            `json:"stats"`
+	VariantStats map[string]*SessionStats `json:"variantStats"`
 }
 
 func (us *Sessions) GetStatus() *SessionsStatus {
-	variantStats := make(map[string]*SessionStats)
-	for _, variant := range us.Variants {
-		variantStats[variant.Id] = us.getStatsForVariant(variant)
-	}
 	return &SessionsStatus{
 		Active:       us.Active,
 		Config:       us.config,
-		Stats:        us.getStatsForVariant(nil),
-		VariantStats: variantStats,
+		Stats:        getStatsForVariant(nil, us.UserSessions, us.SessionTimeout),
+		VariantStats: getVariantStats(us.Variants, us.UserSessions, us.SessionTimeout),
 	}
 }
 
-func (us *Sessions) getStatsForVariant(variant *Variant) *SessionStats {
+func getVariantStats(variants map[string]*Variant, userSessions map[string]*UserSession, sessionTimeout int64) map[string]*SessionStats {
+	variantStats := make(map[string]*SessionStats)
+	for _, variant := range variants {
+		variantStats[variant.Id] = getStatsForVariant(variant, userSessions, sessionTimeout)
+	}
+	return variantStats
+}
+
+func getStatsForVariant(variant *Variant, userSessions map[string]*UserSession, sessionTimeout int64) *SessionStats {
 	views := int64(0)
 	lastVisitTimestamp := int64(0)
 	activeSessions := int64(0)
+	activeSessionsTotal := int64(0)
 	sessionCount := int64(0)
+
 	now := time.Now().Unix()
-	for _, s := range us.UserSessions {
+	for _, s := range userSessions {
+		sessionIsActive := s.Pageviews > 1 && now-s.LastVisit < sessionTimeout
+		if sessionIsActive {
+			activeSessionsTotal++
+		}
 		if variant == nil || s.VariantId == variant.Id {
 			views += s.Pageviews
 			if s.LastVisit > lastVisitTimestamp {
 				lastVisitTimestamp = s.LastVisit
 			}
 			sessionCount++
-			if s.Pageviews > 1 && now-s.LastVisit < us.SessionTimeout {
+			if sessionIsActive {
 				activeSessions++
 			}
 		}
@@ -58,9 +70,15 @@ func (us *Sessions) getStatsForVariant(variant *Variant) *SessionStats {
 			ts = t.String()
 		}
 	}
+	activeShare := float64(0)
+	if activeSessionsTotal > 0 {
+		activeShare = float64(activeSessions) / float64(activeSessionsTotal)
+	}
 	return &SessionStats{
 		Sessions:       sessionCount,
 		ActiveSessions: activeSessions,
+		Share:          variant.Share,
+		ActiveShare:    activeShare,
 		Pageviews:      views,
 		LastVisit:      ts,
 	}

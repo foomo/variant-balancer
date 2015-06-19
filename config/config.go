@@ -2,22 +2,22 @@ package config
 
 type Node struct {
 	// full URL https://user:pw@domain.com
-	Id     string `json:id"`
-	Server string `json:server"`
+	Id     string `json:"id"`
+	Server string `json:"server"`
 	// name of the session cookie
-	Cookie         string `json:cookie"`
-	MaxConnections int    `json:maxConnections"`
+	Cookie         string `json:"cookie"`
+	MaxConnections int    `json:"maxConnections"`
 }
 
 type Variant struct {
-	Id string `json:id"`
+	Id string `json:"id"`
 	// 0-100 %
-	Share int64   `json:share"`
-	Nodes []*Node `json:nodes"`
+	Share int64   `json:"share"`
+	Nodes []*Node `json:"nodes"`
 }
 
 type Config struct {
-	Id             string     `json:id"`
-	Variants       []*Variant `json:variants"`
-	SessionTimeout int        `json:sessionTimeout"`
+	Id             string     `json:"id"`
+	Variants       []*Variant `json:"variants"`
+	SessionTimeout int        `json:"sessionTimeout"`
 }

@@ -7,10 +7,10 @@ import (
 )
 
 type Variant struct {
-	Id         string
-	SessionIds []string
-	Share      float64
-	Proxy      *vp.Proxy
+	Id string
+	//SessionIds []string
+	Share float64
+	Proxy *vp.Proxy
 }
 
 func NewVariant(c *config.Variant) *Variant {
