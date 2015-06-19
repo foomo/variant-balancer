@@ -142,7 +142,7 @@ func TestNodeResolution(t *testing.T) {
 			req.AddCookie(cookie)
 		}
 		writer := httptest.NewRecorder()
-		extractedSessionId, _ := proxy.ServeHTTPAndCache(writer, req, "")
+		extractedSessionId, _, _ := proxy.ServeHTTPAndCache(writer, req, "")
 		return extractedSessionId
 	}
 

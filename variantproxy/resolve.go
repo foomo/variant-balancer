@@ -4,7 +4,7 @@ import (
 	"net/http"
 )
 
-func (p *Proxy) ResolveNode(incomingRequest *http.Request) (n *Node, sessionId string) {
+func (p *Proxy) ResolveNode(incomingRequest *http.Request) (n *Node, cookieName string, sessionId string) {
 	availableNodes := []*Node{}
 	sessionId = ""
 	for _, node := range p.Nodes {
@@ -12,6 +12,7 @@ func (p *Proxy) ResolveNode(incomingRequest *http.Request) (n *Node, sessionId s
 		//debug("looking for", node.SessionCookieName, "for", node.Url, "in", incomingRequest.Cookies(), err, cookie)
 		if err == nil && cookie != nil && len(cookie.Value) > 0 {
 			sessionId = cookie.Value
+			cookieName = cookie.Name
 			availableNodes = append(availableNodes, node)
 		}
 	}
@@ -22,7 +23,7 @@ func (p *Proxy) ResolveNode(incomingRequest *http.Request) (n *Node, sessionId s
 	} else {
 		debug("resolve node: found a session group")
 	}
-	return p.balance(availableNodes), sessionId
+	return p.balance(availableNodes), cookieName, sessionId
 }
 
 func (p *Proxy) balance(nodes []*Node) *Node {

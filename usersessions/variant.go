@@ -22,6 +22,6 @@ func NewVariant(c *config.Variant) *Variant {
 	return v
 }
 
-func (v *Variant) Serve(w http.ResponseWriter, incomingRequest *http.Request, cacheId string) (sessionId string, err error) {
+func (v *Variant) Serve(w http.ResponseWriter, incomingRequest *http.Request, cacheId string) (sessionId string, cookieName string, err error) {
 	return v.Proxy.ServeHTTPAndCache(w, incomingRequest, cacheId)
 }

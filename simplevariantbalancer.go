@@ -1,14 +1,14 @@
 package main
 
 import (
-	b "github.com/foomo/variant-balancer/variantbalancer"
+	"github.com/foomo/variant-balancer/variantbalancer"
 	"log"
 	"net/http"
 	"strings"
 )
 
 type simpleHandler struct {
-	balancer *b.Balancer
+	balancer *variantbalancer.Balancer
 }
 
 const routeAPI = "/balancer-api/"
@@ -39,6 +39,6 @@ func (s *simpleHandler) getCacheId(path string) string {
 
 func main() {
 	http.ListenAndServe("0.0.0.0:8080", &simpleHandler{
-		balancer: b.NewBalancer(),
+		balancer: variantbalancer.NewBalancer(),
 	})
 }

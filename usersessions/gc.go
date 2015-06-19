@@ -11,26 +11,23 @@ func (us *Sessions) collectGarbage(maxAge int64, minViews int) {
 	log.Println("[DEBUG]: --------------------------------------------------")
 	log.Println("[DEBUG]: SessionID Garbage Collection Routine started!")
 	log.Println("[DEBUG]: active sessionCookieNames:", us.sessionCookieNames)
-
-	log.Println("[DEBUG]: active sessions:")
-	count := 0
-	for _, session := range us.UserSessions {
-		count++
-		log.Println("[DEBUG]: #", count, "UserSession.Id:", session.Id, "UserSession.Pageviews:", session.Pageviews, "UserSession.Lastvisit:", session.LastVisit)
-	}
-
 	lowerBound := time.Now().Unix() - maxAge
-	for key, session := range us.UserSessions {
-		if session.Pageviews < int64(minViews) || session.LastVisit < lowerBound {
-			us.sessionDeleteChannel <- key
-			log.Println("[DEBUG]: deleted", key, "from map!")
+	for cookieName, sessions := range us.UserSessions {
+		for sessionId, session := range sessions {
+			if session.Pageviews < int64(minViews) || session.LastVisit < lowerBound {
+				us.sessionDeleteChannel <- &variantSessionPing{
+					CookieName: cookieName,
+					SessionId:  sessionId,
+					VariantId:  session.VariantId,
+				}
+			}
 		}
 	}
 }
 
 func (us *Sessions) gcRoutine() {
 	for {
-		time.Sleep(time.Second)
+		time.Sleep(time.Second * 180)
 		if len(us.UserSessions) != 0 {
 			// there are sessions
 			us.collectGarbage(us.SessionTimeout, 2)

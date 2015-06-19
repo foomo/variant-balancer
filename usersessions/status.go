@@ -31,7 +31,7 @@ func (us *Sessions) GetStatus() *SessionsStatus {
 	}
 }
 
-func getVariantStats(variants map[string]*Variant, userSessions map[string]*UserSession, sessionTimeout int64) map[string]*SessionStats {
+func getVariantStats(variants map[string]*Variant, userSessions map[string]map[string]*UserSession, sessionTimeout int64) map[string]*SessionStats {
 	variantStats := make(map[string]*SessionStats)
 	for _, variant := range variants {
 		variantStats[variant.Id] = getStatsForVariant(variant, userSessions, sessionTimeout)
@@ -39,7 +39,7 @@ func getVariantStats(variants map[string]*Variant, userSessions map[string]*User
 	return variantStats
 }
 
-func getStatsForVariant(variant *Variant, userSessions map[string]*UserSession, sessionTimeout int64) *SessionStats {
+func getStatsForVariant(variant *Variant, userSessions map[string]map[string]*UserSession, sessionTimeout int64) *SessionStats {
 	views := int64(0)
 	lastVisitTimestamp := int64(0)
 	activeSessions := int64(0)
@@ -47,20 +47,23 @@ func getStatsForVariant(variant *Variant, userSessions map[string]*UserSession, 
 	sessionCount := int64(0)
 
 	now := time.Now().Unix()
-	for _, s := range userSessions {
-		sessionIsActive := s.Pageviews > 1 && now-s.LastVisit < sessionTimeout
-		if sessionIsActive {
-			activeSessionsTotal++
-		}
-		if variant == nil || s.VariantId == variant.Id {
-			views += s.Pageviews
-			if s.LastVisit > lastVisitTimestamp {
-				lastVisitTimestamp = s.LastVisit
-			}
-			sessionCount++
+	for _, sessions := range userSessions {
+		for _, s := range sessions {
+			sessionIsActive := s.Pageviews > 1 && now-s.LastVisit < sessionTimeout
 			if sessionIsActive {
-				activeSessions++
+				activeSessionsTotal++
 			}
+			if variant == nil || s.VariantId == variant.Id {
+				views += s.Pageviews
+				if s.LastVisit > lastVisitTimestamp {
+					lastVisitTimestamp = s.LastVisit
+				}
+				sessionCount++
+				if sessionIsActive {
+					activeSessions++
+				}
+			}
+
 		}
 	}
 	ts := "---"
@@ -74,10 +77,14 @@ func getStatsForVariant(variant *Variant, userSessions map[string]*UserSession, 
 	if activeSessionsTotal > 0 {
 		activeShare = float64(activeSessions) / float64(activeSessionsTotal)
 	}
+	var share float64
+	if variant != nil {
+		share = variant.Share
+	}
 	return &SessionStats{
 		Sessions:       sessionCount,
 		ActiveSessions: activeSessions,
-		Share:          variant.Share,
+		Share:          share,
 		ActiveShare:    activeShare,
 		Pageviews:      views,
 		LastVisit:      ts,

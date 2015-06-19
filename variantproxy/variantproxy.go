@@ -9,7 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strings"
+	//"strings"
 	"time"
 )
 
@@ -36,10 +36,10 @@ func newProxy(nodes []*Node) *Proxy {
 	return p
 }
 
-func (p *Proxy) ServeHTTPAndCache(w http.ResponseWriter, incomingRequest *http.Request, cacheId string) (sessionId string, err error) {
-	node, sessionId := p.ResolveNode(incomingRequest)
+func (p *Proxy) ServeHTTPAndCache(w http.ResponseWriter, incomingRequest *http.Request, cacheId string) (sessionId string, cookieName string, err error) {
+	node, sessionId, cookieName := p.ResolveNode(incomingRequest)
 	if node == nil {
-		return "", errors.New("No node to serve response")
+		return "", "", errors.New("No node to serve response")
 	}
 	debug("serving from", node.Id, "for session", sessionId)
 	srw := newSnifferResponseWriter(w, node.SessionCookieName)
@@ -48,13 +48,13 @@ func (p *Proxy) ServeHTTPAndCache(w http.ResponseWriter, incomingRequest *http.R
 	if len(cacheId) > 0 {
 		// stuff that can be cached does not set cookies
 		p.serveFromCacheWithNode(w, incomingRequest, node, cacheId)
-		return sessionId, nil
+		return sessionId, cookieName, nil
 	} else {
 		node.ServeHTTP(srw, incomingRequest)
 		if len(srw.SessionId) > 0 {
-			return srw.SessionId, nil
+			return srw.SessionId, srw.cookieName, nil
 		} else {
-			return sessionId, nil
+			return sessionId, cookieName, nil
 		}
 	}
 }
@@ -90,10 +90,12 @@ func (p *Proxy) serveFromCacheWithNode(w http.ResponseWriter, req *http.Request,
 		data := crw.bytes
 
 		// check if resources are javascript or css files, if true compress
-		if (strings.HasSuffix(req.RequestURI, ".js") || strings.HasSuffix(req.RequestURI, ".css")) && !strings.Contains(crw.Header().Get("Content-Encoding"), "gzip") {
-			debug("	compressing", crw.Header().Get("Content-Encoding"), req.RequestURI)
-			data = compress(data)
-		}
+		/*
+			if (strings.HasSuffix(req.RequestURI, ".js") || strings.HasSuffix(req.RequestURI, ".css")) && !strings.Contains(crw.Header().Get("Content-Encoding"), "gzip") {
+				debug("	compressing", crw.Header().Get("Content-Encoding"), req.RequestURI)
+				data = compress(data)
+			}
+		*/
 		// save resources to cache
 		if crw.statusCode == 304 {
 			debug("	304", "ID:", cacheId, "URI:", req.RequestURI)

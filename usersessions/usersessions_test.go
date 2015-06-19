@@ -65,7 +65,7 @@ func TestUserSessions(t *testing.T) {
 			}
 			req.AddCookie(cookie)
 		}
-		sessionId, err = us.ServeVariant(v, writer, req, "")
+		sessionId, err = us.serveVariant(v, writer, req, "")
 		return writer, sessionId, err
 	}
 
@@ -92,9 +92,15 @@ func TestUserSessions(t *testing.T) {
 		us := NewSessions(c)
 		variantA := us.Variants[variantConfigA.Id]
 		variantB := us.Variants[variantConfigB.Id]
+
 		convey.Convey("Then I can get a random variant", func() {
 			convey.So(us.GetBalancedRandomVariant(), convey.ShouldNotBeNil)
 		})
+
+		convey.Convey("I can get a status", func() {
+			us.GetStatus()
+		})
+
 		convey.Convey("When I put some traffic on the universe", func() {
 			for i := 0; i < 1000; i++ {
 				randomVariant := us.GetBalancedRandomVariant()
@@ -116,11 +122,11 @@ func TestUserSessions(t *testing.T) {
 			jsonDump(t, statsA)
 			jsonDump(t, statsB)
 			convey.Convey("Then we should see some evenly distributed load", func() {
-				convey.So(statsA.ActiveSessions, convey.ShouldEqual, 900)
-				convey.So(statsB.ActiveSessions, convey.ShouldEqual, 100)
-
-				convey.So(statsA.ActiveShare, convey.ShouldEqual, statsA.Share)
-				convey.So(statsB.ActiveShare, convey.ShouldEqual, statsB.Share)
+				convey.So(statsA.ActiveSessions, convey.ShouldBeGreaterThan, 890)
+				convey.So(statsB.ActiveSessions, convey.ShouldBeGreaterThan, 98)
+				limit := float64(0.01)
+				convey.So(statsA.ActiveShare, convey.ShouldBeBetween, statsA.Share+limit, statsA.Share-limit)
+				convey.So(statsB.ActiveShare, convey.ShouldBeBetween, statsB.Share+limit, statsB.Share-limit)
 
 			})
 		})

@@ -7,7 +7,7 @@ type UserSession struct {
 	VariantId string
 }
 
-func NewUserSession(sessionPing *VariantSessionPing) *UserSession {
+func NewUserSession(sessionPing *variantSessionPing) *UserSession {
 	return &UserSession{
 		Pageviews: 0,
 		LastVisit: 0,

@@ -15,8 +15,8 @@ func getBalancedRandomVariantId(variantStats map[string]*SessionStats) (variantI
 	return variantId
 }
 
-func (us *Sessions) getVariantForUserSessionId(sessionId string) *Variant {
-	session, ok := us.UserSessions[sessionId]
+func (us *Sessions) getVariantForUserSessionId(sessionId string, cookieName string) *Variant {
+	session, ok := us.UserSessions[cookieName][sessionId]
 	if ok {
 		variant, ok := us.Variants[session.VariantId]
 		if ok {
