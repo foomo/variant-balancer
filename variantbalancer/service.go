@@ -48,7 +48,7 @@ func (s *Service) ServeHTTP(routeAPI string, w http.ResponseWriter, incomingRequ
 		if err != nil {
 			panic(err)
 		}
-		s.balancer.RunSession(c)
+		s.balancer.RunSession(c, false)
 		jsonReply(w, c)
 	case "status":
 		jsonReply(w, Status{

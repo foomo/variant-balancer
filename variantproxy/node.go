@@ -18,6 +18,8 @@ type Node struct {
 	ReverseProxy      *httputil.ReverseProxy
 	channelOpenConn   chan int
 	channelCloseConn  chan int
+	user              string
+	password          string
 }
 
 func NewNode(nodeConfig *config.Node) *Node {
@@ -26,6 +28,14 @@ func NewNode(nodeConfig *config.Node) *Node {
 		panic(err)
 	}
 	reverseProxy := httputil.NewSingleHostReverseProxy(url)
+	password := ""
+	user := ""
+	if url.User != nil {
+		password, _ = url.User.Password()
+		if len(password) > 0 {
+			user = url.User.Username()
+		}
+	}
 	n := &Node{
 		Server:            nodeConfig.Server,
 		Url:               url,
@@ -37,6 +47,8 @@ func NewNode(nodeConfig *config.Node) *Node {
 		maxConnections:    nodeConfig.MaxConnections,
 		channelOpenConn:   make(chan int),
 		channelCloseConn:  make(chan int),
+		user:              user,
+		password:          password,
 	}
 	go func() {
 		debugConn := func(msg string) {
@@ -80,6 +92,10 @@ func (n *Node) ServeHTTP(w http.ResponseWriter, incomingRequest *http.Request) {
 		}
 	}()
 	// there is no error propagation here
+
+	if len(n.user) > 0 && incomingRequest.URL.User == nil {
+		incomingRequest.SetBasicAuth(n.user, n.password)
+	}
 	n.ReverseProxy.ServeHTTP(w, incomingRequest)
 	n.closeConn()
 }

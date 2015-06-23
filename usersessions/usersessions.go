@@ -51,7 +51,7 @@ func NewSessions(c *config.Config) *Sessions {
 	go us.sessionPingRoutine()
 
 	// starting garbage collection routine
-	//go us.gcRoutine()
+	go us.gcRoutine()
 
 	return us
 }

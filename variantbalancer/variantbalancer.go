@@ -22,11 +22,21 @@ func NewBalancer() *Balancer {
 	return b
 }
 
-func (b *Balancer) RunSession(c *config.Config) {
+func (b *Balancer) RunSession(c *config.Config, flushSessions bool) {
 	userSessions := us.NewSessions(c)
-	b.UserSessions = append(b.UserSessions, userSessions)
-	for i, userSessions := range b.UserSessions {
-		userSessions.Active = i == len(b.UserSessions)-1
+	if flushSessions {
+		userSessions.Active = true
+		oldSessions := b.UserSessions
+		b.UserSessions = []*us.Sessions{userSessions}
+		for _, oldSession := range oldSessions {
+			oldSession.Active = false
+		}
+	} else {
+		b.UserSessions = append(b.UserSessions, userSessions)
+		for i, userSessions := range b.UserSessions {
+			userSessions.Active = i == len(b.UserSessions)-1
+		}
+
 	}
 }
 
