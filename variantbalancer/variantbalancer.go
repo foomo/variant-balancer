@@ -7,10 +7,15 @@ import (
 	"net/http"
 )
 
+type RandomVariantResolver interface {
+	ResolveRandomVariantFor(userSessions *us.Sessions, req *http.Request) *us.Variant
+}
+
 type Balancer struct {
 	//
-	UserSessions []*us.Sessions
-	Service      *Service
+	UserSessions          []*us.Sessions
+	Service               *Service
+	RandomVariantResolver RandomVariantResolver
 }
 
 func NewBalancer() *Balancer {
@@ -53,7 +58,12 @@ func (b *Balancer) ServeHTTP(w http.ResponseWriter, incomingRequest *http.Reques
 		for _, sessions := range b.UserSessions {
 			variant := sessions.GetExistingUserVariant(incomingRequest)
 			if variant == nil && sessions.Active {
-				variant = sessions.GetBalancedRandomVariant()
+				if b.RandomVariantResolver != nil {
+					variant = b.RandomVariantResolver.ResolveRandomVariantFor(sessions, incomingRequest)
+				}
+				if variant == nil {
+					variant = sessions.GetBalancedRandomVariant()
+				}
 			}
 			if variant != nil {
 				return sessions.ServeVariant(variant, w, incomingRequest, cacheId)
