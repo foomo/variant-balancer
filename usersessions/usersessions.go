@@ -69,60 +69,53 @@ func (us *Sessions) sessionPingRoutine() {
 				}
 				session, ok := us.UserSessions[sessionPing.CookieName][sessionPing.SessionId]
 				if !ok {
-					//log.Println("[DEBUG]: creating new Session!")
 					session = NewUserSession(sessionPing)
 					us.UserSessions[sessionPing.CookieName][sessionPing.SessionId] = session
 				}
 				session.LastVisit = time.Now().Unix()
 				session.Pageviews++
-			} else {
-				//log.Println("[DEBUG]: sessionPing.SessionId is empty!")
 			}
 		}
 	}
 }
 
-func (s *Sessions) extractSessionId(incomingRequest *http.Request) (sessionId string, cookieName string) {
-	//log.Println("extractSessionId", s.sessionCookieNames, incomingRequest.Cookies())
+func (s *Sessions) extractSessionId(incomingRequest *http.Request) (sessionID string, cookieName string) {
 	for _, cookieName = range s.sessionCookieNames {
 		cookie, err := incomingRequest.Cookie(cookieName)
 		if err == nil && cookie != nil && len(cookie.Value) > 0 {
-			//log.Println("found", cookieName, cookie)
 			return cookie.Value, cookieName
 		}
 	}
-	//log.Println("cookie not found")
 	return "", ""
 }
 
-// get an existing user variant
+// GetExistingUserVariant get an existing user variant
 func (us *Sessions) GetExistingUserVariant(incomingRequest *http.Request) *Variant {
-	sessionId, cookieName := us.extractSessionId(incomingRequest)
-	if len(sessionId) > 0 {
-		return us.getVariantForUserSessionId(sessionId, cookieName)
+	sessionID, cookieName := us.extractSessionId(incomingRequest)
+	if len(sessionID) > 0 {
+		return us.getVariantForUserSessionId(sessionID, cookieName)
 	}
 	return nil
 }
 
 func (us *Sessions) GetBalancedRandomVariant() *Variant {
-	variantId := getBalancedRandomVariantId(getVariantStats(us.Variants, us.UserSessions, us.SessionTimeout))
-	variant, _ := us.Variants[variantId]
+	variantID := getBalancedRandomVariantId(getVariantStats(us.Variants, us.UserSessions, us.SessionTimeout))
+	variant, _ := us.Variants[variantID]
 	return variant
 }
 
-func (us *Sessions) serveVariant(variant *Variant, w http.ResponseWriter, incomingRequest *http.Request, cacheId string) (sessionId string, err error) {
-	sessionId, cookieName, err := variant.Serve(w, incomingRequest, cacheId)
-	if err == nil && len(sessionId) > 0 {
+func (us *Sessions) serveVariant(variant *Variant, w http.ResponseWriter, incomingRequest *http.Request) (sessionID string, err error) {
+	sessionID, cookieName, err := variant.Serve(w, incomingRequest)
+	if err == nil && len(sessionID) > 0 {
 		us.sessionPingChannel <- &variantSessionPing{
-			SessionId:  sessionId,
+			SessionId:  sessionID,
 			VariantId:  variant.Id,
 			CookieName: cookieName,
 		}
 	}
 	return
-
 }
-func (us *Sessions) ServeVariant(variant *Variant, w http.ResponseWriter, incomingRequest *http.Request, cacheId string) (err error) {
-	_, err = us.serveVariant(variant, w, incomingRequest, cacheId)
+func (us *Sessions) ServeVariant(variant *Variant, w http.ResponseWriter, incomingRequest *http.Request) (err error) {
+	_, err = us.serveVariant(variant, w, incomingRequest)
 	return err
 }

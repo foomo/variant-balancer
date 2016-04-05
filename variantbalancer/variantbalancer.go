@@ -2,9 +2,10 @@ package variantbalancer
 
 import (
 	"errors"
+	"net/http"
+
 	"github.com/foomo/variant-balancer/config"
 	us "github.com/foomo/variant-balancer/usersessions"
-	"net/http"
 )
 
 type RandomVariantResolver interface {
@@ -53,7 +54,7 @@ func (b *Balancer) GetUserSessionsStatus() []*us.SessionsStatus {
 	return sessionsStatus
 }
 
-func (b *Balancer) ServeHTTP(w http.ResponseWriter, incomingRequest *http.Request, cacheId string) error {
+func (b *Balancer) ServeHTTP(w http.ResponseWriter, incomingRequest *http.Request) error {
 	if len(b.UserSessions) > 0 {
 		for _, sessions := range b.UserSessions {
 			variant := sessions.GetExistingUserVariant(incomingRequest)
@@ -66,15 +67,14 @@ func (b *Balancer) ServeHTTP(w http.ResponseWriter, incomingRequest *http.Reques
 				}
 			}
 			if variant != nil {
-				return sessions.ServeVariant(variant, w, incomingRequest, cacheId)
+				return sessions.ServeVariant(variant, w, incomingRequest)
 			}
 		}
 		w.WriteHeader(http.StatusServiceUnavailable)
 		w.Write([]byte("503 - no variant to serve"))
 		return errors.New("no variant to serve")
-	} else {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		w.Write([]byte("503 - not available at the moment (no config?)"))
-		return errors.New("not available at the moment (no config?)")
 	}
+	w.WriteHeader(http.StatusServiceUnavailable)
+	w.Write([]byte("503 - not available at the moment (no config?)"))
+	return errors.New("not available at the moment (no config?)")
 }

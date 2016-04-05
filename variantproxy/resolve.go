@@ -4,14 +4,14 @@ import (
 	"net/http"
 )
 
-func (p *Proxy) ResolveNode(incomingRequest *http.Request) (n *Node, cookieName string, sessionId string) {
+func (p *Proxy) ResolveNode(incomingRequest *http.Request) (n *Node, cookieName string, sessionID string) {
 	availableNodes := []*Node{}
-	sessionId = ""
+	sessionID = ""
 	for _, node := range p.Nodes {
 		cookie, err := incomingRequest.Cookie(node.SessionCookieName)
 		//debug("looking for", node.SessionCookieName, "for", node.Url, "in", incomingRequest.Cookies(), err, cookie)
 		if err == nil && cookie != nil && len(cookie.Value) > 0 {
-			sessionId = cookie.Value
+			sessionID = cookie.Value
 			cookieName = cookie.Name
 			availableNodes = append(availableNodes, node)
 		}
@@ -23,7 +23,7 @@ func (p *Proxy) ResolveNode(incomingRequest *http.Request) (n *Node, cookieName 
 	} else {
 		debug("resolve node: found a session group")
 	}
-	return p.balance(availableNodes), cookieName, sessionId
+	return p.balance(availableNodes), cookieName, sessionID
 }
 
 func (p *Proxy) balance(nodes []*Node) *Node {
@@ -32,14 +32,14 @@ func (p *Proxy) balance(nodes []*Node) *Node {
 		minLoadNode := nodes[0]
 		for _, node := range nodes[1:] {
 			if Debug {
-				debug("	node", node.Id, node.Load())
+				debug("	node", node.ID, node.Load())
 			}
 			if node.Load() < minLoadNode.Load() {
 				minLoadNode = node
 			}
 		}
 		if Debug {
-			debug("	min load is on", minLoadNode.Id, minLoadNode.Load())
+			debug("	min load is on", minLoadNode.ID, minLoadNode.Load())
 		}
 		return minLoadNode
 	}

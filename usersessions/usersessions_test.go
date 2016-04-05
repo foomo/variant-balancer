@@ -2,12 +2,13 @@ package usersessions
 
 import (
 	"encoding/json"
-	"github.com/foomo/variant-balancer/config"
-	"github.com/smartystreets/goconvey/convey"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"testing"
+
+	"github.com/foomo/variant-balancer/config"
+	"github.com/smartystreets/goconvey/convey"
 )
 
 const cookieName = "testCookie"
@@ -19,10 +20,10 @@ func makeNode(id string) (nodeConfig *config.Node, server *httptest.Server) {
 		_, cookieErr := r.Cookie(cookieName)
 		if cookieErr != nil {
 			sessionCounter++
-			sessionId := "sess-" + id + strconv.Itoa(sessionCounter)
+			sessionID := "sess-" + id + strconv.Itoa(sessionCounter)
 			cookie := &http.Cookie{
 				Name:   cookieName,
-				Value:  sessionId,
+				Value:  sessionID,
 				Path:   "/",
 				Domain: r.URL.Host,
 			}
@@ -65,7 +66,7 @@ func TestUserSessions(t *testing.T) {
 			}
 			req.AddCookie(cookie)
 		}
-		sessionId, err = us.serveVariant(v, writer, req, "")
+		sessionId, err = us.serveVariant(v, writer, req)
 		return writer, sessionId, err
 	}
 

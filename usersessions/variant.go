@@ -1,9 +1,10 @@
 package usersessions
 
 import (
+	"net/http"
+
 	"github.com/foomo/variant-balancer/config"
 	vp "github.com/foomo/variant-balancer/variantproxy"
-	"net/http"
 )
 
 type Variant struct {
@@ -22,6 +23,7 @@ func NewVariant(c *config.Variant) *Variant {
 	return v
 }
 
-func (v *Variant) Serve(w http.ResponseWriter, incomingRequest *http.Request, cacheId string) (sessionId string, cookieName string, err error) {
-	return v.Proxy.ServeHTTPAndCache(w, incomingRequest, cacheId)
+// Serve serve a http request
+func (v *Variant) Serve(w http.ResponseWriter, incomingRequest *http.Request) (sessionID string, cookieName string, err error) {
+	return v.Proxy.Serve(w, incomingRequest)
 }

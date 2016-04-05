@@ -1,17 +1,19 @@
 package variantproxy
 
 import (
-	"github.com/foomo/variant-balancer/config"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+
+	"github.com/foomo/variant-balancer/config"
 )
 
+// Node of a variant
 type Node struct {
 	Server            string
-	Url               *url.URL
+	URL               *url.URL
 	SessionCookieName string
-	Id                string
+	ID                string
 	openConnections   int
 	maxConnections    int
 	Hits              int64
@@ -38,9 +40,9 @@ func NewNode(nodeConfig *config.Node) *Node {
 	}
 	n := &Node{
 		Server:            nodeConfig.Server,
-		Url:               url,
+		URL:               url,
 		Hits:              0,
-		Id:                nodeConfig.Id,
+		ID:                nodeConfig.Id,
 		ReverseProxy:      reverseProxy,
 		SessionCookieName: nodeConfig.Cookie,
 		openConnections:   0,
@@ -53,7 +55,7 @@ func NewNode(nodeConfig *config.Node) *Node {
 	go func() {
 		debugConn := func(msg string) {
 			if Debug {
-				debug(msg, n.Id, "================================> open", n.openConnections, "hits", n.Hits, "load", n.Load())
+				debug(msg, n.ID, "================================> open", n.openConnections, "hits", n.Hits, "load", n.Load())
 			}
 		}
 		for {
@@ -63,21 +65,21 @@ func NewNode(nodeConfig *config.Node) *Node {
 				n.openConnections--
 			case <-n.channelOpenConn:
 				n.Hits++
-				debugConn("node open conn")
 				n.openConnections++
+				debugConn("node open conn")
 			}
 		}
 	}()
 	return n
 }
 
+// Load calculate current load
 func (n *Node) Load() float64 {
 	if n.openConnections > 0 {
 		l := float64(n.openConnections) / float64(n.maxConnections)
 		return l
-	} else {
-		return 0
 	}
+	return 0.0
 }
 
 func (n *Node) closeConn() {
@@ -91,8 +93,6 @@ func (n *Node) ServeHTTP(w http.ResponseWriter, incomingRequest *http.Request) {
 			n.closeConn()
 		}
 	}()
-	// there is no error propagation here
-
 	if len(n.user) > 0 && incomingRequest.URL.User == nil {
 		incomingRequest.SetBasicAuth(n.user, n.password)
 	}

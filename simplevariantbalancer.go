@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/foomo/variant-balancer/variantbalancer"
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/foomo/variant-balancer/variantbalancer"
 )
 
 type simpleHandler struct {
@@ -14,27 +15,17 @@ type simpleHandler struct {
 const routeAPI = "/balancer-api/"
 
 func (s *simpleHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	//w.Write([]byte("hello"))
 	log.Println("serving", req.URL.Path)
 	switch true {
 	case strings.HasPrefix(req.URL.Path, routeAPI):
 		s.balancer.Service.ServeHTTP(routeAPI, w, req)
 	default:
-		err := s.balancer.ServeHTTP(w, req, s.getCacheId(req.URL.Path))
+		err := s.balancer.ServeHTTP(w, req)
 		if err != nil {
 			log.Println("balancer error", err)
 		}
 	}
 
-}
-
-func (s *simpleHandler) getCacheId(path string) string {
-	// this is obviously a naive implementation
-	switch true {
-	case strings.HasSuffix(path, ".txt"), strings.HasSuffix(path, ".css"), strings.HasSuffix(path, ".jpg"), strings.HasSuffix(path, ".gif"), strings.HasSuffix(path, ".png"), strings.HasSuffix(path, ".js"):
-		return path
-	}
-	return ""
 }
 
 func main() {

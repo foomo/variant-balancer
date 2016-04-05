@@ -4,17 +4,19 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/hex"
-	"github.com/foomo/variant-balancer/config"
-	"github.com/smartystreets/goconvey/convey"
-	"github.com/stretchr/testify/assert"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/foomo/variant-balancer/config"
+	"github.com/smartystreets/goconvey/convey"
+	"github.com/stretchr/testify/assert"
 )
 
-func makeSessionId() (string, error) {
+func makeSessionID() (string, error) {
 	uuid := make([]byte, 16)
 	n, err := rand.Read(uuid)
 	if n != len(uuid) || err != nil {
@@ -35,25 +37,24 @@ func TestUtils(t *testing.T) {
 	assert.True(t, len(c) > 0)
 }
 
-func getTestStuff() (ts *httptest.Server, node *Node) {
-	return getTestServerAndNode("foo", "test", 2)
+func getTestStuff(serverSleepTime time.Duration, maxConnections int) (ts *httptest.Server, node *Node) {
+	return getTestServerAndNode("foo", "test", maxConnections, serverSleepTime)
 }
 
-func getTestServerAndNode(id string, cookieName string, maxConnections int) (ts *httptest.Server, node *Node) {
+func getTestServerAndNode(id string, cookieName string, maxConnections int, serverSleepTime time.Duration) (ts *httptest.Server, node *Node) {
 	ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(time.Millisecond * 200)
+		time.Sleep(serverSleepTime)
 		_, cookieErr := r.Cookie(cookieName)
 		if cookieErr != nil {
-			sessionId, _ := makeSessionId()
+			sessionID, _ := makeSessionID()
 			cookie := &http.Cookie{
 				Name:   cookieName,
-				Value:  sessionId,
+				Value:  sessionID,
 				Path:   "/",
 				Domain: r.URL.Host,
 			}
 			http.SetCookie(w, cookie)
 		}
-
 		w.Write(hello)
 	}))
 	nodeConfig := &config.Node{
@@ -66,10 +67,12 @@ func getTestServerAndNode(id string, cookieName string, maxConnections int) (ts 
 }
 
 func TestNode(t *testing.T) {
-	Debug = true
+	//Debug = true
 	var wg sync.WaitGroup
 
-	ts, n := getTestStuff()
+	// long server sleep time needed in order to be able to observe load
+	const maxConnections = 2
+	ts, n := getTestStuff(time.Millisecond*100, maxConnections)
 	defer ts.Close()
 
 	call := func(n *Node, path string) {
@@ -89,17 +92,20 @@ func TestNode(t *testing.T) {
 		})
 
 		convey.Convey("If we perform 4 parallel calls the load should go up to 2.0", func() {
+			numCalls := float64(4)
+			for i := float64(0); i < numCalls; i += 1.0 {
+				call(n, "/")
+			}
 
-			call(n, "/")
-			call(n, "/")
-			call(n, "/")
-			call(n, "/")
-
-			time.Sleep(time.Millisecond * 10)
-			convey.So(n.Load(), convey.ShouldEqual, 2.0)
+			// make sure that the calls have reached the server
+			time.Sleep(time.Millisecond * 50)
+			load := numCalls / float64(maxConnections)
+			convey.So(n.Load(), convey.ShouldEqual, load)
 
 			convey.Convey("once the requests were answered the load should be back to 0.0", func() {
+				// make sure all calls are done and accounted for
 				wg.Wait()
+				time.Sleep(time.Millisecond * 10)
 				convey.So(n.Load(), convey.ShouldEqual, 0.0)
 			})
 
@@ -110,7 +116,7 @@ func TestNode(t *testing.T) {
 
 func TestCuriousResponseWriter(t *testing.T) {
 
-	ts, n := getTestStuff()
+	ts, n := getTestStuff(time.Millisecond, 2)
 	defer ts.Close()
 	req, _ := http.NewRequest("GET", ts.URL+"/", nil)
 	curiousCat := NewCuriousResponseWriter(httptest.NewRecorder())
@@ -130,7 +136,7 @@ func TestNodeResolution(t *testing.T) {
 
 	var wg sync.WaitGroup
 
-	call := func(proxy *Proxy, cookieName string, sessionId string, path string) string {
+	call := func(proxy *Proxy, cookieName string, sessionId string, path string) (string, error) {
 		req, _ := http.NewRequest("GET", "http://127.0.0.1"+path, nil)
 		if len(sessionId) > 0 {
 			cookie := &http.Cookie{
@@ -142,26 +148,34 @@ func TestNodeResolution(t *testing.T) {
 			req.AddCookie(cookie)
 		}
 		writer := httptest.NewRecorder()
-		extractedSessionId, _, _ := proxy.ServeHTTPAndCache(writer, req, "")
-		return extractedSessionId
+		extractedSessionID, proxyCookieName, err := proxy.Serve(writer, req)
+		if err != nil {
+			return "", err
+		}
+		if proxyCookieName != cookieName {
+			return "", fmt.Errorf("cookieName %q did not match server cookie name %q", cookieName, proxyCookieName)
+		}
+		return extractedSessionID, nil
 	}
 
-	callConcurrently := func(concurrency int, proxy *Proxy, cookieName string, sessionId string, path string) {
+	callConcurrently := func(concurrency int, proxy *Proxy, cookieName string, sessionId string) error {
+		var e error
 		for i := 0; i < concurrency; i++ {
 			wg.Add(1)
+			time.Sleep(time.Millisecond * 1)
 			go func(ii int) {
-				sleepTime := time.Millisecond * 10 * time.Duration(ii)
-				//debug("will sleep for", sleepTime, "before i ", ii, "call with", cookieName, sessionId)
-				time.Sleep(sleepTime)
-				//debug("======================> woke up for", ii)
-				newSessionId := call(proxy, cookieName, sessionId, path)
-				if newSessionId != sessionId {
-					t.Log("an existing session got fucked up: old session id:", sessionId, "=> new session id:", newSessionId, "for cookie", cookieName)
+				newSessionID, err := call(proxy, cookieName, sessionId, "/")
+				if err != nil {
+					e = err
+				}
+				if newSessionID != sessionId {
+					t.Log("an existing session got fucked up: old session id:", sessionId, "=> new session id:", newSessionID, "for cookie:", cookieName)
 				}
 				wg.Done()
 			}(i)
 		}
 		wg.Wait()
+		return e
 	}
 
 	convey.Convey("Given we fire up a few servers with nodes in front of them", t, func() {
@@ -169,18 +183,19 @@ func TestNodeResolution(t *testing.T) {
 		cookieNameA := "foomoSessionA"
 		cookieNameB := "foomoSessionB"
 
+		const serverSleepTime = time.Millisecond * 10
 		// session group a
-		serverAA, nodeAA := getTestServerAndNode("aa", cookieNameA, 1)
-		serverAB, nodeAB := getTestServerAndNode("ab", cookieNameA, 1)
-		serverAC, nodeAC := getTestServerAndNode("ac", cookieNameA, 1)
+		serverAA, nodeAA := getTestServerAndNode("aa", cookieNameA, 1, serverSleepTime)
+		serverAB, nodeAB := getTestServerAndNode("ab", cookieNameA, 1, serverSleepTime)
+		serverAC, nodeAC := getTestServerAndNode("ac", cookieNameA, 1, serverSleepTime)
 		defer serverAA.Close()
 		defer serverAB.Close()
 		defer serverAC.Close()
 
 		// session group b
-		serverBA, nodeBA := getTestServerAndNode("ba", cookieNameB, 2)
-		serverBB, nodeBB := getTestServerAndNode("bb", cookieNameB, 2)
-		serverBC, nodeBC := getTestServerAndNode("bc", cookieNameB, 2)
+		serverBA, nodeBA := getTestServerAndNode("ba", cookieNameB, 2, serverSleepTime)
+		serverBB, nodeBB := getTestServerAndNode("bb", cookieNameB, 2, serverSleepTime)
+		serverBC, nodeBC := getTestServerAndNode("bc", cookieNameB, 2, serverSleepTime)
 		defer serverBA.Close()
 		defer serverBB.Close()
 		defer serverBC.Close()
@@ -201,15 +216,23 @@ func TestNodeResolution(t *testing.T) {
 		proxy := newProxy([]*Node{nodeAA, nodeAB, nodeAC, nodeBA, nodeBB, nodeBC})
 
 		expectedHitsSessionGroupA := 0
-		expectedHitsSessionGroupB := 0
-		convey.Convey("when we call the proxy, it calls the server and extracts a session id", func() {
-			sessionId := call(proxy, cookieNameA, "", "/")
-			expectedHitsSessionGroupA++
-			convey.So(sessionId, convey.ShouldNotBeEmpty)
+		const expectedHitsSessionGroupB = 0
 
-			convey.Convey("once w have a session and call with it concurrently", func() {
-				callConcurrently(4, proxy, cookieNameA, sessionId, "/")
-				expectedHitsSessionGroupA += 4
+		convey.Convey("when we call the proxy, it calls the server and extracts a session id", func() {
+			sessionID, err := call(proxy, cookieNameA, "", "/")
+			if err != nil {
+				t.Fatal(err)
+			}
+			expectedHitsSessionGroupA++
+			convey.So(sessionID, convey.ShouldNotBeEmpty)
+
+			convey.Convey("once we have a session and call with it concurrently", func() {
+				const concurrency = 100
+				err = callConcurrently(concurrency, proxy, cookieNameA, sessionID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				expectedHitsSessionGroupA += concurrency
 
 				convey.Convey("all hits have gone to session group a", func() {
 					convey.So(hitsInSessionGroupA(), convey.ShouldEqual, expectedHitsSessionGroupA)
@@ -222,62 +245,19 @@ func TestNodeResolution(t *testing.T) {
 				})
 
 				convey.Convey("traffic will be distributed evenly in the session group A", func() {
+					t.Log(
+						"nodeAA.Hits:", nodeAA.Hits,
+						"nodeAB.Hits:", nodeAB.Hits,
+						"nodeAC.Hits:", nodeAC.Hits,
+					)
 					convey.So(nodeAA.Hits, convey.ShouldBeGreaterThan, 0)
 					convey.So(nodeAB.Hits, convey.ShouldBeGreaterThan, 0)
 					convey.So(nodeAC.Hits, convey.ShouldBeGreaterThan, 0)
+					convey.So(nodeAA.Hits+nodeAB.Hits+nodeAC.Hits, convey.ShouldEqual, concurrency+1)
 				})
 
 			})
 
-		})
-	})
-
-}
-
-func TestProxyCache(t *testing.T) {
-
-	call := func(proxy *Proxy, cookieName string, sessionId string, path string) {
-		req, _ := http.NewRequest("GET", "http://127.0.0.1"+path, nil)
-		if len(sessionId) > 0 {
-			cookie := &http.Cookie{
-				Name:   cookieName,
-				Value:  sessionId,
-				Path:   "/",
-				Domain: req.URL.Host,
-			}
-			req.AddCookie(cookie)
-		}
-		writer := httptest.NewRecorder()
-		proxy.ServeHTTPAndCache(writer, req, path)
-		if writer.Body.Len() == 0 {
-			t.Fatal("empty reply")
-		}
-	}
-
-	cookieName := "foo"
-	serverA, nodeA := getTestServerAndNode("aa", cookieName, 1)
-	serverB, nodeB := getTestServerAndNode("ab", cookieName, 1)
-
-	defer serverA.Close()
-	defer serverB.Close()
-
-	convey.Convey("Given I set up a proxy", t, func() {
-		proxy := newProxy([]*Node{nodeA, nodeB})
-		convey.Convey("When I call the proxy allowing it to cache", func() {
-			pathAndId := "/"
-			call(proxy, cookieName, "", pathAndId)
-			convey.Convey("Then there is an item in my cache", func() {
-				convey.So(proxy.cache.GetLock(pathAndId), convey.ShouldNotBeNil)
-			})
-			convey.Convey("When I request the item again, there will be no further requests to the nodes", func() {
-				currentHits := func() int64 { return nodeA.Hits + nodeB.Hits }
-				expectedHits := currentHits()
-				call(proxy, cookieName, "", pathAndId)
-				call(proxy, cookieName, "", pathAndId)
-				call(proxy, cookieName, "", pathAndId)
-				call(proxy, cookieName, "", pathAndId)
-				convey.So(currentHits(), convey.ShouldEqual, expectedHits)
-			})
 		})
 	})
 
