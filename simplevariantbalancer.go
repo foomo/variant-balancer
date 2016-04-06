@@ -25,11 +25,22 @@ func (s *simpleHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			log.Println("balancer error", err)
 		}
 	}
-
 }
 
 func main() {
-	http.ListenAndServe("0.0.0.0:8080", &simpleHandler{
+	errChan := make(chan error)
+
+	simpleHandler := &simpleHandler{
 		balancer: variantbalancer.NewBalancer(),
-	})
+	}
+
+	go func() {
+		errChan <- http.ListenAndServe("0.0.0.0:8080", simpleHandler)
+	}()
+
+	go func() {
+		errChan <- http.ListenAndServe("0.0.0.0:8081", simpleHandler)
+	}()
+
+	log.Fatal(<-errChan)
 }

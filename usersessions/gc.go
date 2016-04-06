@@ -5,7 +5,8 @@ import (
 	"time"
 )
 
-var GCInterval = 180
+// GCInterval set the interval for session garbage collection
+var GCInterval = time.Second * 180
 
 // @param maxAge: maximum Age of a SessionID. e.g: maxAge = 60s -> every SessionID without a visit in the 60s will be removed.
 // @param minViews: minimum amount of pageviews, if not satisfied sessionID will be removed.
