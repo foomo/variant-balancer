@@ -30,7 +30,7 @@ func (us *Sessions) collectGarbage(maxAge int64, minViews int) {
 
 func (us *Sessions) gcRoutine() {
 	for {
-		time.Sleep(time.Second * time.Duration(GCInterval))
+		time.Sleep(GCInterval)
 		if len(us.UserSessions) != 0 {
 			// there are sessions
 			us.collectGarbage(us.SessionTimeout, 2)

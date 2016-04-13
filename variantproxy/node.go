@@ -1,6 +1,7 @@
 package variantproxy
 
 import (
+	"crypto/tls"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -30,6 +31,11 @@ func NewNode(nodeConfig *config.Node) *Node {
 		panic(err)
 	}
 	reverseProxy := httputil.NewSingleHostReverseProxy(url)
+	if nodeConfig.InsecureSkipVerify {
+		reverseProxy.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+	}
 	password := ""
 	user := ""
 	if url.User != nil {

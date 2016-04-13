@@ -5,8 +5,9 @@ type Node struct {
 	Id     string `json:"id"`
 	Server string `json:"server"`
 	// name of the session cookie
-	Cookie         string `json:"cookie"`
-	MaxConnections int    `json:"maxConnections"`
+	Cookie             string `json:"cookie"`
+	MaxConnections     int    `json:"maxConnections"`
+	InsecureSkipVerify bool   `json:"insecureSkipVerify"`
 }
 
 type Variant struct {
