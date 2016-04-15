@@ -3,7 +3,9 @@ package usersessions
 func getBalancedRandomVariantId(variantStats map[string]*SessionStats) (variantId string) {
 	distances := make(map[string]float64)
 	for id, stats := range variantStats {
-		distances[id] = stats.Share - stats.ActiveShare
+		if stats.Share > 0.0 {
+			distances[id] = stats.Share - stats.ActiveShare
+		}
 	}
 	d := float64(-100000000000)
 	for id, distance := range distances {
