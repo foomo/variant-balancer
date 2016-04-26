@@ -1,9 +1,6 @@
 package usersessions
 
-import (
-	"log"
-	"time"
-)
+import "time"
 
 // GCInterval set the interval for session garbage collection
 var GCInterval = time.Second * 180
@@ -11,9 +8,6 @@ var GCInterval = time.Second * 180
 // @param maxAge: maximum Age of a SessionID. e.g: maxAge = 60s -> every SessionID without a visit in the 60s will be removed.
 // @param minViews: minimum amount of pageviews, if not satisfied sessionID will be removed.
 func (us *Sessions) collectGarbage(maxAge int64, minViews int) {
-	log.Println("[DEBUG]: --------------------------------------------------", us.config.Id)
-	log.Println("[DEBUG]: SessionID Garbage Collection Routine started!")
-	log.Println("[DEBUG]: active sessionCookieNames:", us.sessionCookieNames)
 	lowerBound := time.Now().Unix() - maxAge
 	for cookieName, sessions := range us.UserSessions {
 		for sessionId, session := range sessions {
@@ -36,7 +30,6 @@ func (us *Sessions) gcRoutine() {
 			us.collectGarbage(us.SessionTimeout, 2)
 		}
 		if us.Active == false {
-			log.Println("user sessions expired", us.config.Id)
 			return
 		}
 	}

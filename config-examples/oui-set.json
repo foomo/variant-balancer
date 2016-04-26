@@ -1,0 +1,30 @@
+{
+	"id" : "oui-set",
+	"sessionTimeout":3600,
+	"variants" : [
+		{
+			"id" : "set",
+			"share": 30,
+			"nodes" : [
+				{
+					"id" : "set-a",
+					"server" : "https://www.set-fashion.com/",
+					"cookie" : "foomoSessionProd",
+					"maxConnections": 100
+				}
+			]
+		},
+		{
+			"id" : "oui",
+			"share": 70,
+			"nodes" : [
+				{
+					"id" : "oui-a",
+					"server" : "https://www.oui.com/",
+					"cookie" : "foomoSessionProd",
+					"maxConnections": 100					
+				}
+			]
+		}
+	]
+}

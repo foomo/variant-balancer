@@ -1,0 +1,30 @@
+{
+	"id" : "oui-schild",
+	"sessionTimeout":3600,
+	"variants" : [
+		{
+			"id" : "set",
+			"share": 50,
+			"nodes" : [
+				{
+					"id" : "set-a",
+					"server" : "https://www.set-fashion.com",
+					"cookie" : "foomoSessionProd",
+					"maxConnections": 100
+				}
+			]
+		},
+		{
+			"id" : "schild",
+			"share": 50,
+			"nodes" : [
+				{
+					"id" : "schild-a",
+					"server" : "https://demo:b3stbyt3s@schild-prod-a.bestbytes.net",
+					"cookie" : "schildSession",
+					"maxConnections": 100					
+				}
+			]
+		}
+	]
+}
