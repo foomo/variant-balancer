@@ -43,7 +43,6 @@ func (p *Proxy) Serve(w http.ResponseWriter, incomingRequest *http.Request) (ses
 	}
 	debug("serving from", node.ID, "for session", sessionID)
 	srw := newSnifferResponseWriter(w, node.SessionCookieName)
-	incomingRequest.Host = node.URL.Host
 	node.ServeHTTP(srw, incomingRequest)
 	if len(srw.SessionId) > 0 {
 		return srw.SessionId, srw.cookieName, nil
