@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"time"
 
 	"github.com/foomo/variant-balancer/config"
 )
@@ -24,6 +25,8 @@ type Node struct {
 	user              string
 	password          string
 }
+
+var CloseIdleProxyTransportConnectionsAfter = time.Second * 60
 
 func NewNode(nodeConfig *config.Node) *Node {
 	url, err := url.Parse(nodeConfig.Server)
@@ -66,6 +69,17 @@ func NewNode(nodeConfig *config.Node) *Node {
 		}
 		for {
 			select {
+			case <-time.After(CloseIdleProxyTransportConnectionsAfter):
+				// idle connection maintenance
+				// this should become obsolete:
+				// https://github.com/golang/go/issues/6785 and others ...
+				proxyTransport := n.ReverseProxy.Transport.(*http.Transport)
+				if proxyTransport != nil {
+					debugConn("closing idle connections")
+					proxyTransport.CloseIdleConnections()
+				} else {
+					debugConn("can not close idle connections")
+				}
 			case <-n.channelCloseConn:
 				debugConn("node close conn")
 				n.openConnections--
