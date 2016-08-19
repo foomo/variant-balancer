@@ -2,6 +2,7 @@ package variantproxy
 
 import (
 	"crypto/tls"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -35,9 +36,24 @@ func NewNode(nodeConfig *config.Node) *Node {
 	}
 	reverseProxy := httputil.NewSingleHostReverseProxy(url)
 	if nodeConfig.InsecureSkipVerify {
-		reverseProxy.Transport = &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		// unfourtunately there is no method to construct a default transport in the net/http package
+		// there this is a copy of http.DefaultTransport
+		myDefaultTransportInstance := &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
 		}
+		// our magnificent change
+		myDefaultTransportInstance.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: true,
+		}
+		reverseProxy.Transport = myDefaultTransportInstance
 	}
 	password := ""
 	user := ""
