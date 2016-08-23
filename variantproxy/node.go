@@ -77,25 +77,36 @@ func NewNode(nodeConfig *config.Node) *Node {
 		user:              user,
 		password:          password,
 	}
-	go func() {
-		debugConn := func(msg string) {
-			if Debug {
-				debug(msg, n.ID, "================================> open", n.openConnections, "hits", n.Hits, "load", n.Load())
-			}
+	debugConn := func(msg string) {
+		if Debug {
+			debug(msg, n.ID, "================================> open", n.openConnections, "hits", n.Hits, "load", n.Load())
 		}
+	}
+
+	go func() {
 		for {
 			select {
 			case <-time.After(CloseIdleProxyTransportConnectionsAfter):
 				// idle connection maintenance
 				// this should become obsolete:
 				// https://github.com/golang/go/issues/6785 and others ...
-				proxyTransport := n.ReverseProxy.Transport.(*http.Transport)
-				if proxyTransport != nil {
-					debugConn("closing idle connections")
-					proxyTransport.CloseIdleConnections()
+				if n.ReverseProxy.Transport != nil {
+					proxyTransport := n.ReverseProxy.Transport.(*http.Transport)
+					if proxyTransport != nil {
+						debugConn("closing idle connections")
+						proxyTransport.CloseIdleConnections()
+					} else {
+						debugConn("can not close idle connections")
+					}
 				} else {
-					debugConn("can not close idle connections")
+					debugConn("no proxy transport yet")
 				}
+			}
+		}
+	}()
+	go func() {
+		for {
+			select {
 			case <-n.channelCloseConn:
 				debugConn("node close conn")
 				n.openConnections--
