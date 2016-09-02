@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/foomo/variant-balancer/config"
 	"github.com/smartystreets/goconvey/convey"
@@ -102,6 +103,10 @@ func TestUserSessions(t *testing.T) {
 			us.GetStatus()
 		})
 
+		convey.Convey("I can run a garbage collection", func() {
+			us.collectGarbage(0, 1)
+		})
+
 		convey.Convey("When I put some traffic on the universe", func() {
 			for i := 0; i < 1000; i++ {
 				randomVariant := us.GetBalancedRandomVariant()
@@ -118,8 +123,8 @@ func TestUserSessions(t *testing.T) {
 				call(us, randomVariant, sessionId, "/foo")
 				call(us, randomVariant, sessionId, "/bar")
 			}
-			statsA := getStatsForVariant(variantA, us.UserSessions, us.SessionTimeout)
-			statsB := getStatsForVariant(variantB, us.UserSessions, us.SessionTimeout)
+			statsA := getStatsForVariant(variantA, us.userSessions, us.SessionTimeout)
+			statsB := getStatsForVariant(variantB, us.userSessions, us.SessionTimeout)
 			jsonDump(t, statsA)
 			jsonDump(t, statsB)
 			convey.Convey("Then we should see some evenly distributed load", func() {
@@ -128,8 +133,21 @@ func TestUserSessions(t *testing.T) {
 				limit := float64(0.01)
 				convey.So(statsA.ActiveShare, convey.ShouldBeBetween, statsA.Share+limit, statsA.Share-limit)
 				convey.So(statsB.ActiveShare, convey.ShouldBeBetween, statsB.Share+limit, statsB.Share-limit)
+				convey.Convey("When we wait another 2 seconds", func() {
+
+					convey.Convey("Then an aggressive gc took them all", func() {
+						time.Sleep(time.Second * 2)
+						us.collectGarbage(1, 1000000)
+						time.Sleep(time.Millisecond * 100)
+						statsA := getStatsForVariant(variantA, us.userSessions, us.SessionTimeout)
+						statsB := getStatsForVariant(variantB, us.userSessions, us.SessionTimeout)
+						convey.So(statsA.ActiveSessions, convey.ShouldEqual, 0)
+						convey.So(statsB.ActiveSessions, convey.ShouldEqual, 0)
+					})
+				})
 
 			})
+
 		})
 	})
 }

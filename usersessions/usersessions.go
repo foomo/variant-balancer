@@ -1,6 +1,8 @@
 package usersessions
 
 import (
+	"sync"
+
 	"github.com/foomo/variant-balancer/config"
 	//"log"
 	"net/http"
@@ -13,14 +15,19 @@ type variantSessionPing struct {
 	CookieName string
 }
 
+type userSessions struct {
+	sync.RWMutex
+	m map[string]map[string]*UserSession
+}
+
 type Sessions struct {
 	// will i accept new client or am I about to gracefully shutdown
 	SessionTimeout       int64
 	Active               bool
-	UserSessions         map[string]map[string]*UserSession
+	userSessions         *userSessions
 	Variants             map[string]*Variant
 	sessionPingChannel   chan *variantSessionPing
-	sessionDeleteChannel chan *variantSessionPing
+	sessionDeleteChannel chan []*variantSessionPing
 	sessionCookieNames   []string
 	config               *config.Config
 }
@@ -31,11 +38,13 @@ func NewSessions(c *config.Config) *Sessions {
 		variants[variantConfig.Id] = NewVariant(variantConfig)
 	}
 	us := &Sessions{
-		Active:               true,
-		UserSessions:         make(map[string]map[string]*UserSession),
+		Active: true,
+		userSessions: &userSessions{
+			m: map[string]map[string]*UserSession{},
+		},
 		Variants:             variants,
 		sessionPingChannel:   make(chan *variantSessionPing),
-		sessionDeleteChannel: make(chan *variantSessionPing),
+		sessionDeleteChannel: make(chan []*variantSessionPing),
 		sessionCookieNames:   []string{},
 		SessionTimeout:       int64(c.SessionTimeout),
 		config:               c,
@@ -59,19 +68,26 @@ func NewSessions(c *config.Config) *Sessions {
 func (us *Sessions) sessionPingRoutine() {
 	for {
 		select {
-		case sessionPingOfDeath := <-us.sessionDeleteChannel:
-			delete(us.UserSessions[sessionPingOfDeath.CookieName], sessionPingOfDeath.SessionId)
+		case sessionPingsOfDeath := <-us.sessionDeleteChannel:
+			us.userSessions.Lock()
+			for _, sessionPingOfDeath := range sessionPingsOfDeath {
+				//fmt.Println("deleting", sessionPingOfDeath.SessionId, len(us.userSessions.m[sessionPingOfDeath.CookieName]))
+				delete(us.userSessions.m[sessionPingOfDeath.CookieName], sessionPingOfDeath.SessionId)
+			}
+			us.userSessions.Unlock()
 		case sessionPing := <-us.sessionPingChannel:
 			if len(sessionPing.SessionId) > 0 {
-				_, ok := us.UserSessions[sessionPing.CookieName]
+				us.userSessions.Lock()
+				_, ok := us.userSessions.m[sessionPing.CookieName]
 				if !ok {
-					us.UserSessions[sessionPing.CookieName] = make(map[string]*UserSession)
+					us.userSessions.m[sessionPing.CookieName] = map[string]*UserSession{}
 				}
-				session, ok := us.UserSessions[sessionPing.CookieName][sessionPing.SessionId]
+				session, ok := us.userSessions.m[sessionPing.CookieName][sessionPing.SessionId]
 				if !ok {
 					session = NewUserSession(sessionPing)
-					us.UserSessions[sessionPing.CookieName][sessionPing.SessionId] = session
+					us.userSessions.m[sessionPing.CookieName][sessionPing.SessionId] = session
 				}
+				us.userSessions.Unlock()
 				session.LastVisit = time.Now().Unix()
 				session.Pageviews++
 			}
@@ -99,7 +115,8 @@ func (us *Sessions) GetExistingUserVariant(incomingRequest *http.Request) *Varia
 }
 
 func (us *Sessions) GetBalancedRandomVariant() *Variant {
-	variantID := getBalancedRandomVariantId(getVariantStats(us.Variants, us.UserSessions, us.SessionTimeout))
+
+	variantID := getBalancedRandomVariantId(getVariantStats(us.Variants, us.userSessions, us.SessionTimeout))
 	variant, _ := us.Variants[variantID]
 	return variant
 }

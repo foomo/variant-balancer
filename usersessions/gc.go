@@ -9,23 +9,27 @@ var GCInterval = time.Second * 180
 // @param minViews: minimum amount of pageviews, if not satisfied sessionID will be removed.
 func (us *Sessions) collectGarbage(maxAge int64, minViews int) {
 	lowerBound := time.Now().Unix() - maxAge
-	for cookieName, sessions := range us.UserSessions {
+	pings := []*variantSessionPing{}
+	us.userSessions.RLock()
+	for cookieName, sessions := range us.userSessions.m {
 		for sessionId, session := range sessions {
 			if session.Pageviews < int64(minViews) || session.LastVisit < lowerBound {
-				us.sessionDeleteChannel <- &variantSessionPing{
+				pings = append(pings, &variantSessionPing{
 					CookieName: cookieName,
 					SessionId:  sessionId,
 					VariantId:  session.VariantId,
-				}
+				})
 			}
 		}
 	}
+	us.userSessions.RUnlock()
+	us.sessionDeleteChannel <- pings
 }
 
 func (us *Sessions) gcRoutine() {
 	for {
 		time.Sleep(GCInterval)
-		if len(us.UserSessions) != 0 {
+		if us.userSessions != nil && len(us.userSessions.m) != 0 {
 			// there are sessions
 			us.collectGarbage(us.SessionTimeout, 2)
 		}

@@ -18,7 +18,17 @@ func getBalancedRandomVariantId(variantStats map[string]*SessionStats) (variantI
 }
 
 func (us *Sessions) getVariantForUserSessionId(sessionId string, cookieName string) *Variant {
-	session, ok := us.UserSessions[cookieName][sessionId]
+	if us.userSessions == nil {
+		return nil
+	}
+	us.userSessions.RLock()
+	sessions, ok := us.userSessions.m[cookieName]
+	if !ok {
+		us.userSessions.RUnlock()
+		return nil
+	}
+	session, ok := sessions[sessionId]
+	us.userSessions.RUnlock()
 	if ok {
 		variant, ok := us.Variants[session.VariantId]
 		if ok {

@@ -1,9 +1,10 @@
 package usersessions
 
 import (
-	"github.com/foomo/variant-balancer/config"
 	"strconv"
 	"time"
+
+	"github.com/foomo/variant-balancer/config"
 )
 
 type SessionStats struct {
@@ -26,20 +27,20 @@ func (us *Sessions) GetStatus() *SessionsStatus {
 	return &SessionsStatus{
 		Active:       us.Active,
 		Config:       us.config,
-		Stats:        getStatsForVariant(nil, us.UserSessions, us.SessionTimeout),
-		VariantStats: getVariantStats(us.Variants, us.UserSessions, us.SessionTimeout),
+		Stats:        getStatsForVariant(nil, us.userSessions, us.SessionTimeout),
+		VariantStats: getVariantStats(us.Variants, us.userSessions, us.SessionTimeout),
 	}
 }
 
-func getVariantStats(variants map[string]*Variant, userSessions map[string]map[string]*UserSession, sessionTimeout int64) map[string]*SessionStats {
-	variantStats := make(map[string]*SessionStats)
+func getVariantStats(variants map[string]*Variant, userSessions *userSessions, sessionTimeout int64) map[string]*SessionStats {
+	variantStats := map[string]*SessionStats{}
 	for _, variant := range variants {
 		variantStats[variant.Id] = getStatsForVariant(variant, userSessions, sessionTimeout)
 	}
 	return variantStats
 }
 
-func getStatsForVariant(variant *Variant, userSessions map[string]map[string]*UserSession, sessionTimeout int64) *SessionStats {
+func getStatsForVariant(variant *Variant, userSessions *userSessions, sessionTimeout int64) *SessionStats {
 	views := int64(0)
 	lastVisitTimestamp := int64(0)
 	activeSessions := int64(0)
@@ -47,7 +48,8 @@ func getStatsForVariant(variant *Variant, userSessions map[string]map[string]*Us
 	sessionCount := int64(0)
 
 	now := time.Now().Unix()
-	for _, sessions := range userSessions {
+	userSessions.RLock()
+	for _, sessions := range userSessions.m {
 		for _, s := range sessions {
 			sessionIsActive := s.Pageviews > 1 && now-s.LastVisit < sessionTimeout
 			if sessionIsActive {
@@ -66,6 +68,7 @@ func getStatsForVariant(variant *Variant, userSessions map[string]map[string]*Us
 
 		}
 	}
+	userSessions.RUnlock()
 	ts := "---"
 	if lastVisitTimestamp > 0 {
 		t, err := time.ParseDuration(strconv.Itoa(int(now-lastVisitTimestamp)) + "s")
