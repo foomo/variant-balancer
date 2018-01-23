@@ -4,9 +4,9 @@ import (
 	"sync"
 
 	"github.com/foomo/variant-balancer/config"
-	//"log"
 	"net/http"
 	"time"
+	"github.com/foomo/variant-balancer/context"
 )
 
 type variantSessionPing struct {
@@ -121,8 +121,10 @@ func (us *Sessions) GetBalancedRandomVariant() *Variant {
 	return variant
 }
 
-func (us *Sessions) serveVariant(variant *Variant, w http.ResponseWriter, incomingRequest *http.Request) (sessionID string, err error) {
-	sessionID, cookieName, err := variant.Serve(w, incomingRequest)
+func (us *Sessions) serveVariant(variant *Variant, w http.ResponseWriter, r *http.Request) (sessionID string, err error) {
+	context.Get(r).VariantID = variant.Id //Add Variant to Context ID
+	sessionID, cookieName, err := variant.Serve(w, r)
+
 	if err == nil && len(sessionID) > 0 {
 		us.sessionPingChannel <- &variantSessionPing{
 			SessionId:  sessionID,

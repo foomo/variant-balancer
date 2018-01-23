@@ -6,6 +6,7 @@ import (
 
 	"github.com/foomo/variant-balancer/config"
 	us "github.com/foomo/variant-balancer/usersessions"
+	"github.com/foomo/variant-balancer/context"
 )
 
 type RandomVariantResolver interface {
@@ -55,6 +56,7 @@ func (b *Balancer) GetUserSessionsStatus() []*us.SessionsStatus {
 }
 
 func (b *Balancer) ServeHTTP(w http.ResponseWriter, incomingRequest *http.Request) error {
+	context.Initialize(incomingRequest)
 	if len(b.UserSessions) > 0 {
 		for _, sessions := range b.UserSessions {
 			variant := sessions.GetExistingUserVariant(incomingRequest)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/foomo/variant-balancer/config"
 	//"strings"
+	"github.com/foomo/variant-balancer/context"
 )
 
 // Proxy a proxy for a variant
@@ -38,9 +39,14 @@ func newProxy(nodes []*Node) *Proxy {
 // Serve serve a http request
 func (p *Proxy) Serve(w http.ResponseWriter, incomingRequest *http.Request) (sessionID string, cookieName string, err error) {
 	node, cookieName, sessionID := p.ResolveNode(incomingRequest)
+
 	if node == nil {
 		return "", "", errors.New("No node to serve response")
 	}
+	ctx := context.Get(incomingRequest)
+	ctx.NodeID = node.ID
+	ctx.SessionID = sessionID
+
 	debug("serving from", node.ID, "for session", sessionID)
 	srw := newSnifferResponseWriter(w, node.SessionCookieName)
 	node.ServeHTTP(srw, incomingRequest)
