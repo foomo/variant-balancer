@@ -7,6 +7,10 @@ import (
 	vp "github.com/foomo/variant-balancer/variantproxy"
 )
 
+const (
+	VariantHeaderKey = "Server-Variant"
+)
+
 type Variant struct {
 	Id string
 	//SessionIds []string
@@ -25,5 +29,6 @@ func NewVariant(c *config.Variant) *Variant {
 
 // Serve serve a http request
 func (v *Variant) Serve(w http.ResponseWriter, incomingRequest *http.Request) (sessionID string, cookieName string, err error) {
+	w.Header().Add(VariantHeaderKey, v.Id)
 	return v.Proxy.Serve(w, incomingRequest)
 }

@@ -11,6 +11,10 @@ import (
 	"github.com/foomo/variant-balancer/config"
 )
 
+const (
+	NodeHeaderKey = "Server-Node"
+)
+
 // Node of a variant
 type Node struct {
 	Server            string
@@ -134,6 +138,7 @@ func (n *Node) closeConn() {
 }
 
 func (n *Node) ServeHTTP(w http.ResponseWriter, incomingRequest *http.Request) {
+	w.Header().Add(NodeHeaderKey, n.ID)
 	n.channelOpenConn <- 1
 	defer func() {
 		if err := recover(); err != nil {
